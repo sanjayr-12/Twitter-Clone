@@ -14,6 +14,7 @@ export const protectRoute = async (req, res, next) => {
 
     const user = await User.findById(decoded.userId).select("-password"); //dont send the password back to the client
     req.user = user;
+    // console.log(req);
     next();
   } catch (error) {
     return res.status(500).json({ error: "Internal server error" });
