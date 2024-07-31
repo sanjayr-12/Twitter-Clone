@@ -47,6 +47,7 @@ export const deletePost = async (req, res) => {
     }
 
     await Post.findByIdAndDelete(req.params.id);
+    res.status(200).json({message:"post deleted successfully"})
   } catch (error) {
     res.status(500).json({ error: "Intenal Server Error" });
   }

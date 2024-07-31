@@ -10,7 +10,7 @@ router.get("/user/:username",protectRoute,getUserPosts)
 router.post("/create", protectRoute, createPost)
 router.post("/like/:id",protectRoute,likePost)
 router.post("/comment/:id",protectRoute,commentPost)
-router.delete("/", protectRoute, deletePost)
+router.delete("/:id", protectRoute, deletePost)
 
 
 
