@@ -2,19 +2,26 @@ import Post from "../models/postModel.js";
 import User from "../models/user.model.js";
 import { v2 as cloudinary } from "cloudinary";
 import Notification from "../models/notification.model.js";
+import { Reko } from "../lib/utils/moderation.js";
 
 export const createPost = async (req, res) => {
   try {
     const { text } = req.body;
-    let { img } = req.body;
+    let { img64: img } = req.body;
+    const file = req.file.buffer;
+    const moderationCheck = await Reko(file);
+    if (
+      moderationCheck.ModerationLabels.length > 0 &&
+      moderationCheck.ModerationLabels[0].Confidence >= 90
+    ) {
+      return res.status(400).json({ error: "Inapproprite image" });
+    }
     const userId = req.user._id.toString();
-
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: "User not found" });
     if (!text && !img) {
       return res.status(400).json({ error: "Post should have the both" });
     }
-
     if (img) {
       const uploadRes = await cloudinary.uploader.upload(img);
       img = uploadRes.secure_url;
@@ -47,7 +54,7 @@ export const deletePost = async (req, res) => {
     }
 
     await Post.findByIdAndDelete(req.params.id);
-    res.status(200).json({message:"post deleted successfully"})
+    res.status(200).json({ message: "post deleted successfully" });
   } catch (error) {
     res.status(500).json({ error: "Intenal Server Error" });
   }
@@ -90,8 +97,8 @@ export const likePost = async (req, res) => {
       res.status(200).json({ message: "Post Unliked successfully" });
     } else {
       //like post
-        post.likes.push(userId);
-        await User.updateOne({_id:userId},{$push:{likedPosts:postId}})
+      post.likes.push(userId);
+      await User.updateOne({ _id: userId }, { $push: { likedPosts: postId } });
       await post.save();
 
       const notification = new Notification({
@@ -129,65 +136,71 @@ export const getAllPosts = async (req, res) => {
   }
 };
 
-
 export const getLikePosts = async (req, res) => {
-    const userId = req.params.id
-    try {
-        const user = await User.findById(userId)
-        if (!user) return res.status(404).json({ error: "User not found" })
-        const likedPosts = await Post.find({ _id: { $in: user.likedPosts } }).populate({
-        path:"user",
-        select:"-password"
-        }).populate({
-            path: "comments.user",
-            select:"-password"
-        })
-        res.status(200).json(likedPosts)
-    } catch (error) {
-        res.status(500).json({error:"Internal server error"})
-    }
-}
-
+  const userId = req.params.id;
+  try {
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: "User not found" });
+    const likedPosts = await Post.find({ _id: { $in: user.likedPosts } })
+      .populate({
+        path: "user",
+        select: "-password",
+      })
+      .populate({
+        path: "comments.user",
+        select: "-password",
+      });
+    res.status(200).json(likedPosts);
+  } catch (error) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
 
 export const getFollowingPost = async (req, res) => {
-    try {
-        const userId = req.user._id;
-        const user = await User.findById(userId)
-        if (!user) {
-            return res.status(404).json({ error: "User not found" })
-        }
-        const following = user.following
-        const feedPosts = await Post.find({ user: { $in: following } }).sort({ createdAt: -1 }).populate({
-            path: "user",
-            select:"-password",
-        }).populate({
-            path: "comments.user",
-            select:"-password",
-        })
-        res.status(200).json(feedPosts)
-    } catch (error) {
-        res.status(500).json({error:"Internal server error"})
+  try {
+    const userId = req.user._id;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
     }
-}
+    const following = user.following;
+    const feedPosts = await Post.find({ user: { $in: following } })
+      .sort({ createdAt: -1 })
+      .populate({
+        path: "user",
+        select: "-password",
+      })
+      .populate({
+        path: "comments.user",
+        select: "-password",
+      });
+    res.status(200).json(feedPosts);
+  } catch (error) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
 
 export const getUserPosts = async (req, res) => {
-    try {
-        const { username } = req.params
-        const user = await User.findOne({ username })
-        if (!user) {
-            return res.status(404).json({ error: "User not found" })
-        }
-
-        const posts = await Post.find({ user: user._id }).sort({ createdAt: -1 }).populate({
-            path: "user",
-            select:"-password",
-        }).populate({
-            path: "comments.user",
-            select:"-password"
-        })
-
-        res.status(200).json(posts)
-    } catch (error) {
-        res.status(500).json({error:"Internal server error"})
+  try {
+    const { username } = req.params;
+    const user = await User.findOne({ username });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
     }
-}
+
+    const posts = await Post.find({ user: user._id })
+      .sort({ createdAt: -1 })
+      .populate({
+        path: "user",
+        select: "-password",
+      })
+      .populate({
+        path: "comments.user",
+        select: "-password",
+      });
+
+    res.status(200).json(posts);
+  } catch (error) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
